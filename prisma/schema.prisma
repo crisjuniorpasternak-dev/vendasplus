@@ -312,3 +312,19 @@ model CampaignRecipient {
   @@unique([campaignId, contactId])
   @@index([campaignId, status])
 }
+
+/// Configurações e segredos gerados pelo próprio sistema (dispensam variáveis de ambiente)
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

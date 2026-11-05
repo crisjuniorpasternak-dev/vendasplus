@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { env } from "./env";
 
 /** Na Vercel o disco é efêmero: com BLOB_READ_WRITE_TOKEN as mídias vão para o Vercel Blob (privado). */
-const blobEnabled = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+const blobEnabled = () => !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",

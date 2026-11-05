@@ -3,21 +3,26 @@ import { prisma } from "./db";
 import { findOrCreateConversation, sendMessage } from "./messaging";
 import { renderMessage } from "./spintax";
 import { readMedia } from "./storage";
+import { APP_TIMEZONE } from "./settings";
+
+/** Hora atual no fuso do sistema (a Vercel roda em UTC). */
+function localHour(now = new Date()) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: APP_TIMEZONE, hour: "numeric", hourCycle: "h23" }).format(now));
+}
 
 const FAR_FUTURE = new Date("2999-01-01T00:00:00Z");
 const rand = (min: number, max: number) => Math.floor(min + Math.random() * (Math.max(max, min) - min + 1));
 
 function inWindow(c: Campaign, now = new Date()) {
-  const h = now.getHours();
+  const h = localHour(now);
   if (c.windowStart === c.windowEnd) return true;
   return c.windowStart < c.windowEnd ? h >= c.windowStart && h < c.windowEnd : h >= c.windowStart || h < c.windowEnd;
 }
 
 function nextWindowStart(c: Campaign, now = new Date()) {
-  const d = new Date(now);
+  const hours = (c.windowStart - localHour(now) + 24) % 24 || 24;
+  const d = new Date(now.getTime() + hours * 3600_000);
   d.setMinutes(0, 0, 0);
-  d.setHours(c.windowStart);
-  if (d <= now) d.setDate(d.getDate() + 1);
   return d;
 }
 

@@ -1,12 +1,20 @@
 import { PrismaClient } from "@prisma/client";
-import { hashPassword } from "../src/lib/auth-hash";
+import { hashPassword, verifyPassword } from "../src/lib/auth-hash";
 
 const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
 
 async function main() {
   const email = (process.env.ADMIN_EMAIL ?? "admin@zapdesk.local").toLowerCase();
-  const password = process.env.ADMIN_PASSWORD ?? "admin123";
-  if (!(await prisma.user.findUnique({ where: { email } }))) {
+  const password = process.env.ADMIN_PASSWORD;
+  // versões antigas criavam admin@zapdesk.local / admin123; sem ADMIN_PASSWORD ele é removido
+  // e o administrador é criado na tela de primeiro acesso.
+  if (!password) {
+    const legacy = await prisma.user.findUnique({ where: { email: "admin@zapdesk.local" } });
+    if (legacy && verifyPassword("admin123", legacy.passwordHash) && (await prisma.user.count()) === 1 && (await prisma.message.count({ where: { senderUserId: legacy.id } })) === 0) {
+      await prisma.user.delete({ where: { id: legacy.id } });
+      console.log("Admin padrão removido: crie o administrador no primeiro acesso.");
+    }
+  } else if (!(await prisma.user.findUnique({ where: { email } }))) {
     await prisma.user.create({ data: { name: process.env.ADMIN_NAME ?? "Administrador", email, role: "ADMIN", passwordHash: hashPassword(password) } });
     console.log(`Usuário admin criado: ${email}`);
   }
