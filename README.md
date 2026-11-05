@@ -34,6 +34,20 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+## Deploy na Vercel
+
+1. Na Vercel: **Add New → Project** e importe o repositório `vendasplus`.
+2. Em **Storage**, crie e conecte ao projeto:
+   - um banco **Postgres (Neon)**: ele cria `DATABASE_URL` e `DATABASE_URL_UNPOOLED`;
+   - um **Blob Store**: ele cria `BLOB_READ_WRITE_TOKEN` (as mídias ficam privadas no Blob, porque o disco da Vercel é apagado a cada execução).
+3. Em **Settings → Environment Variables**, adicione: `APP_URL` (ex.: `https://vendasplus.vercel.app`), `AUTH_SECRET`, `WEBHOOK_SECRET`, `CRON_SECRET`, `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE`, `TZ=America/Sao_Paulo`. **Não** defina `CAMPAIGN_WORKER_INLINE` (na Vercel não existe processo contínuo).
+4. Faça o deploy. O build (`npm run vercel-build`) aplica as migrations e cria o usuário admin.
+5. **Campanhas:** o `vercel.json` agenda `/api/cron/campaigns` a cada minuto. Cron por minuto exige o **plano Pro**; no plano Hobby a Vercel só roda cron 1x por dia, então use um agendador externo gratuito (ex.: cron-job.org) chamando a cada minuto:
+   `https://SEU-DOMINIO/api/cron/campaigns?secret=CRON_SECRET`
+   Cada chamada envia durante ~50 s respeitando o intervalo de cada campanha.
+
+Limites da Vercel: uploads de anexo até ~4,5 MB por requisição; a lista de conversas atualiza por consulta periódica (3–4 s), o que funciona bem em serverless.
+
 ## Conectando a Evolution API
 
 1. No `.env`: `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` e `EVOLUTION_INSTANCE` (nunca no código).

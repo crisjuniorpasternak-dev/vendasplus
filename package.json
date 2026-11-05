@@ -11,10 +11,12 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "setup": "prisma migrate deploy && tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@vercel/blob": "^2.8.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.68.0",

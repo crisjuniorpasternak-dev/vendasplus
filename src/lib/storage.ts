@@ -3,6 +3,9 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { env } from "./env";
 
+/** Na Vercel o disco é efêmero: com BLOB_READ_WRITE_TOKEN as mídias vão para o Vercel Blob (privado). */
+const blobEnabled = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
   "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/webm": "webm", "audio/aac": "aac",
@@ -20,6 +23,11 @@ export async function saveMedia(data: Buffer, mime?: string | null, fileName?: s
   const d = new Date();
   const dir = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}`;
   const rel = `${dir}/${randomUUID()}.${extFor(mime, fileName)}`;
+  if (blobEnabled()) {
+    const { put } = await import("@vercel/blob");
+    await put(`media/${rel}`, data, { access: "private", contentType: mime ?? undefined, addRandomSuffix: false });
+    return rel;
+  }
   const abs = path.resolve(env.uploadDir, rel);
   await mkdir(path.dirname(abs), { recursive: true });
   await writeFile(abs, data);
@@ -33,7 +41,13 @@ export function resolveMedia(rel: string) {
   return abs;
 }
 
-export async function readMedia(rel: string) {
+export async function readMedia(rel: string): Promise<Buffer> {
+  if (blobEnabled()) {
+    const { get } = await import("@vercel/blob");
+    const r = await get(`media/${rel}`, { access: "private" });
+    if (!r || r.statusCode !== 200) throw new Error("mídia não encontrada");
+    return Buffer.from(await new Response(r.stream).arrayBuffer());
+  }
   return readFile(resolveMedia(rel));
 }
 
