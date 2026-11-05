@@ -1,7 +1,6 @@
 /** Leitura centralizada das variáveis de ambiente. Nada de credencial no código. */
 export const env = {
   appUrl: process.env.APP_URL ?? "http://localhost:3000",
-  authSecret: process.env.AUTH_SECRET ?? "",
   webhookSecret: process.env.WEBHOOK_SECRET ?? "",
   uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
   evolution: {

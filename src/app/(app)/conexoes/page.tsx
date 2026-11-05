@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { api, fetcher, formatPhoneClient } from "@/lib/client";
 
 type Conn = { id: string; name: string; provider: "EVOLUTION" | "CLOUD_API"; instanceName: string; status: string; phone: string | null; isDefault: boolean };
-type Resp = { items: Conn[]; config: { evolutionConfigured: boolean; evolutionUrl: string | null; cloudConfigured: boolean; webhookEvolution: string; webhookCloud: string } };
+type Resp = { items: Conn[]; config: { evolutionConfigured: boolean; evolutionUrl: string | null; evolutionFromEnv: boolean; cloudConfigured: boolean; webhookEvolution: string; webhookCloud: string; cronUrl: string | null } };
 
 const STATE: Record<string, [string, string]> = {
   open: ["Conectado", "bg-emerald-50 text-emerald-700"], connecting: ["Conectando", "bg-amber-50 text-amber-700"], qrcode: ["Aguardando QR", "bg-amber-50 text-amber-700"],
@@ -41,14 +41,21 @@ export default function ConexoesPage() {
       </PageHeader>
       <div className="flex-1 overflow-y-auto p-6 scroll-thin">
         <div className="mb-5 grid gap-3 md:grid-cols-2">
-          <ConfigCard ok={!!data?.config.evolutionConfigured} title="Evolution API" lines={[
-            data?.config.evolutionConfigured ? `URL: ${data.config.evolutionUrl}` : "Defina EVOLUTION_API_URL e EVOLUTION_API_KEY no .env",
-            `Webhook: ${data?.config.webhookEvolution ?? ""}`,
-          ]} />
+          <EvolutionCard data={data} onSaved={() => { mutate(); toast("Evolution salva"); }} onError={(m) => toast(m, "error")} />
           <ConfigCard ok={!!data?.config.cloudConfigured} title="WhatsApp Cloud API (oficial)" lines={[
             data?.config.cloudConfigured ? "Token configurado" : "Opcional: defina WHATSAPP_CLOUD_TOKEN e WHATSAPP_CLOUD_VERIFY_TOKEN",
             `Webhook (painel Meta): ${data?.config.webhookCloud ?? ""}`,
           ]} />
+          {data?.config.cronUrl && (
+            <div className="card p-4 text-sm md:col-span-2">
+              <div className="font-medium text-gray-800">Agendador das campanhas</div>
+              <p className="mb-2 text-xs text-gray-500">Para as campanhas dispararem, um agendador precisa chamar esta URL a cada minuto (ex.: cron-job.org, gratuito). Não compartilhe: ela contém um segredo.</p>
+              <div className="flex gap-2">
+                <input readOnly value={data.config.cronUrl} className="input font-mono text-xs" onFocus={(e) => e.target.select()} />
+                <button className="btn-outline shrink-0" onClick={() => { navigator.clipboard.writeText(data.config.cronUrl!); toast("URL copiada"); }}>Copiar</button>
+              </div>
+            </div>
+          )}
         </div>
         {data?.items.length === 0 && <div className="card p-8 text-center text-sm text-gray-500">Nenhuma conexão. Clique em <b>Nova conexão</b> e informe o nome da instância da sua Evolution API.</div>}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -119,5 +126,39 @@ function ConfigCard({ ok, title, lines }: { ok: boolean; title: string; lines: s
         {lines.map((l) => <p key={l} className="break-all text-xs text-gray-500">{l}</p>)}
       </div>
     </div>
+  );
+}
+
+function EvolutionCard({ data, onSaved, onError }: { data?: Resp; onSaved: () => void; onError: (m: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const cfg = data?.config;
+  if (!cfg) return <div className="card p-4" />;
+  if (!editing && (cfg.evolutionConfigured || cfg.evolutionFromEnv)) {
+    return (
+      <div className="card flex gap-3 p-4">
+        <CheckCircle2 className="shrink-0 text-emerald-500" size={20} />
+        <div className="min-w-0 flex-1 text-sm">
+          <div className="flex items-center justify-between"><span className="font-medium text-gray-800">Evolution API</span>{!cfg.evolutionFromEnv && <button className="text-xs text-brand-600 hover:underline" onClick={() => setEditing(true)}>Alterar</button>}</div>
+          <p className="break-all text-xs text-gray-500">URL: {cfg.evolutionUrl}</p>
+          <p className="break-all text-xs text-gray-500">Webhook: {cfg.webhookEvolution}</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <form className="card space-y-2 p-4 text-sm" onSubmit={async (e) => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
+      try { await api("/api/settings/evolution", "PUT", { url: f.url, apiKey: f.apiKey || undefined }); setEditing(false); onSaved(); }
+      catch (x) { onError(x instanceof Error ? x.message : "Erro"); }
+    }}>
+      <div className="flex items-center gap-2 font-medium text-gray-800"><AlertTriangle className="text-amber-500" size={18} /> Configurar Evolution API</div>
+      <div><label className="label">URL da Evolution</label><input name="url" className="input" required defaultValue={cfg.evolutionUrl ?? ""} placeholder="https://evolution.seudominio.com" /></div>
+      <div><label className="label">API key (global)</label><input name="apiKey" type="password" className="input" required={!cfg.evolutionConfigured} placeholder={cfg.evolutionConfigured ? "manter a atual" : ""} autoComplete="off" /></div>
+      <div className="flex justify-end gap-2">
+        {cfg.evolutionConfigured && <button type="button" className="btn-ghost" onClick={() => setEditing(false)}>Cancelar</button>}
+        <button className="btn-primary">Salvar</button>
+      </div>
+    </form>
   );
 }

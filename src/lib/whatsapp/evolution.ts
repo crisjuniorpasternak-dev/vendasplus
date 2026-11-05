@@ -1,5 +1,5 @@
 import type { MessageStatus, MessageType } from "@prisma/client";
-import { env } from "../env";
+import { getEvolutionConfig } from "../settings";
 import { normalizePhone } from "../phone";
 import type { ConnectResult, ConnectionState, InboundEvent, OutgoingMedia, SendResult, WhatsAppProvider } from "./types";
 
@@ -13,12 +13,13 @@ export class EvolutionProvider implements WhatsAppProvider {
   constructor(private instance: string) {}
 
   private async call<T = any>(method: string, path: string, body?: unknown): Promise<T> {
-    if (!env.evolution.url || !env.evolution.apiKey) {
-      throw new Error("Evolution API não configurada: defina EVOLUTION_API_URL e EVOLUTION_API_KEY");
+    const cfg = await getEvolutionConfig();
+    if (!cfg.url || !cfg.apiKey) {
+      throw new Error("Evolution API não configurada: informe a URL e a API key em Conexões");
     }
-    const res = await fetch(`${env.evolution.url}${path}`, {
+    const res = await fetch(`${cfg.url}${path}`, {
       method,
-      headers: { "Content-Type": "application/json", apikey: env.evolution.apiKey },
+      headers: { "Content-Type": "application/json", apikey: cfg.apiKey },
       body: body ? JSON.stringify(body) : undefined,
       cache: "no-store",
     });

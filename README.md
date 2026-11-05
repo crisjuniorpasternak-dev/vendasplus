@@ -21,9 +21,9 @@ Next.js 15 (App Router) + TypeScript + Tailwind CSS 4 · PostgreSQL + Prisma · 
 Pré-requisitos: Node 20+ e PostgreSQL 14+.
 
 ```bash
-cp .env.example .env        # preencha DATABASE_URL, AUTH_SECRET, WEBHOOK_SECRET e a Evolution
+cp .env.example .env        # preencha DATABASE_URL (o resto é opcional)
 npm install
-npm run setup               # cria as tabelas e o usuário admin (ADMIN_EMAIL / ADMIN_PASSWORD)
+npm run setup               # cria as tabelas (o admin é criado no primeiro acesso)
 npm run dev                 # http://localhost:3000
 ```
 
@@ -36,21 +36,19 @@ docker compose up -d --build
 
 ## Deploy na Vercel
 
-1. Na Vercel: **Add New → Project** e importe o repositório `vendasplus`.
-2. Em **Storage**, crie e conecte ao projeto:
-   - um banco **Postgres (Neon)**: ele cria `DATABASE_URL` e `DATABASE_URL_UNPOOLED`;
-   - um **Blob Store**: ele cria `BLOB_READ_WRITE_TOKEN` (as mídias ficam privadas no Blob, porque o disco da Vercel é apagado a cada execução).
-3. Em **Settings → Environment Variables**, adicione: `APP_URL` (ex.: `https://vendasplus.vercel.app`), `AUTH_SECRET`, `WEBHOOK_SECRET`, `CRON_SECRET`, `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE`, `TZ=America/Sao_Paulo`. **Não** defina `CAMPAIGN_WORKER_INLINE` (na Vercel não existe processo contínuo).
-4. Faça o deploy. O build (`npm run vercel-build`) aplica as migrations e cria o usuário admin.
-5. **Campanhas:** a rota `/api/cron/campaigns` precisa ser chamada a cada minuto. No plano Hobby a Vercel recusa crons de menos de 1x/dia (o build falha), por isso o `vercel.json` não agenda nada: use um agendador externo gratuito (ex.: cron-job.org) chamando a cada minuto (no plano Pro dá para adicionar `"crons": [{ "path": "/api/cron/campaigns", "schedule": "* * * * *" }]` ao `vercel.json`):
-   `https://SEU-DOMINIO/api/cron/campaigns?secret=CRON_SECRET`
-   Cada chamada envia durante ~50 s respeitando o intervalo de cada campanha.
+1. Importe o repositório na Vercel e conecte em **Storage** um banco **Postgres (Neon)** e um **Blob Store**. Nenhuma outra variável é obrigatória.
+2. O build (`npm run vercel-build`) aplica as migrations no schema `vendasplus` do banco (não mexe em tabelas que já existam em `public`; mude com `DB_SCHEMA`).
+3. No primeiro acesso ao site aparece a tela **Criar conta de administrador**.
+4. Em **Conexões**: informe URL e API key da Evolution (ficam no banco; se `EVOLUTION_API_URL`/`EVOLUTION_API_KEY` existirem no ambiente, eles têm prioridade), cadastre a instância, conecte pelo QR e clique em *Configurar webhook*. O segredo do webhook é gerado automaticamente.
+5. **Campanhas:** a mesma tela mostra a URL do agendador (`/api/cron/campaigns?secret=...`, segredo gerado automaticamente). Cadastre-a para rodar a cada minuto em um agendador externo gratuito (ex.: cron-job.org). No plano Hobby a Vercel não permite cron a cada minuto; no Pro dá para usar `crons` no `vercel.json`.
 
-Limites da Vercel: uploads de anexo até ~4,5 MB por requisição; a lista de conversas atualiza por consulta periódica (3–4 s), o que funciona bem em serverless.
+Variáveis opcionais: `APP_URL` (senão usa o domínio de produção da Vercel), `WEBHOOK_SECRET`, `CRON_SECRET`, `ADMIN_EMAIL`/`ADMIN_PASSWORD` (cria o admin no build), `APP_TIMEZONE` (padrão `America/Sao_Paulo`, usado na janela de envio).
+
+Limites da Vercel: anexos até ~4,5 MB por requisição; a interface atualiza por consulta periódica (3–4 s).
 
 ## Conectando a Evolution API
 
-1. No `.env`: `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` e `EVOLUTION_INSTANCE` (nunca no código).
+1. Informe URL e API key na tela **Conexões** (ou no `.env`: `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE`). Nunca no código.
 2. `APP_URL` precisa ser uma URL que a Evolution consiga acessar (domínio público ou túnel, ex.: `cloudflared`/`ngrok` em testes).
 3. Em **Conexões**: *Conectar (QR)* → escaneie no celular → *Configurar webhook*. O webhook fica
    `APP_URL/api/webhooks/evolution?token=WEBHOOK_SECRET` com os eventos `MESSAGES_UPSERT`, `MESSAGES_UPDATE`, `MESSAGES_DELETE`, `CONNECTION_UPDATE`, `QRCODE_UPDATED`, `SEND_MESSAGE` e `webhookBase64: true`.
