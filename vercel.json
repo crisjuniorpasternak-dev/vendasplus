@@ -1,5 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run vercel-build",
-  "crons": [{ "path": "/api/cron/campaigns", "schedule": "* * * * *" }]
+  "buildCommand": "npm run vercel-build"
 }

@@ -42,7 +42,7 @@ docker compose up -d --build
    - um **Blob Store**: ele cria `BLOB_READ_WRITE_TOKEN` (as mídias ficam privadas no Blob, porque o disco da Vercel é apagado a cada execução).
 3. Em **Settings → Environment Variables**, adicione: `APP_URL` (ex.: `https://vendasplus.vercel.app`), `AUTH_SECRET`, `WEBHOOK_SECRET`, `CRON_SECRET`, `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE`, `TZ=America/Sao_Paulo`. **Não** defina `CAMPAIGN_WORKER_INLINE` (na Vercel não existe processo contínuo).
 4. Faça o deploy. O build (`npm run vercel-build`) aplica as migrations e cria o usuário admin.
-5. **Campanhas:** o `vercel.json` agenda `/api/cron/campaigns` a cada minuto. Cron por minuto exige o **plano Pro**; no plano Hobby a Vercel só roda cron 1x por dia, então use um agendador externo gratuito (ex.: cron-job.org) chamando a cada minuto:
+5. **Campanhas:** a rota `/api/cron/campaigns` precisa ser chamada a cada minuto. No plano Hobby a Vercel recusa crons de menos de 1x/dia (o build falha), por isso o `vercel.json` não agenda nada: use um agendador externo gratuito (ex.: cron-job.org) chamando a cada minuto (no plano Pro dá para adicionar `"crons": [{ "path": "/api/cron/campaigns", "schedule": "* * * * *" }]` ao `vercel.json`):
    `https://SEU-DOMINIO/api/cron/campaigns?secret=CRON_SECRET`
    Cada chamada envia durante ~50 s respeitando o intervalo de cada campanha.
 
