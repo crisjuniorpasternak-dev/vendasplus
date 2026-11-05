@@ -12,7 +12,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "setup": "prisma migrate deploy && tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build"
+    "vercel-build": "tsx scripts/vercel-build.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

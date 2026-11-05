@@ -1,14 +1,14 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth-hash";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
 
 async function main() {
   const email = (process.env.ADMIN_EMAIL ?? "admin@zapdesk.local").toLowerCase();
   const password = process.env.ADMIN_PASSWORD ?? "admin123";
   if (!(await prisma.user.findUnique({ where: { email } }))) {
     await prisma.user.create({ data: { name: process.env.ADMIN_NAME ?? "Administrador", email, role: "ADMIN", passwordHash: hashPassword(password) } });
-    console.log(`Usuário admin criado: ${email} / ${password}  (troque a senha depois!)`);
+    console.log(`Usuário admin criado: ${email}`);
   }
   if ((await prisma.pipelineStage.count()) === 0) {
     const stages = ["Novo lead", "Em contato", "Proposta enviada", "Negociação", "Fechamento"];
