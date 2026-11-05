@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  AGENT
+}
+
+enum Provider {
+  EVOLUTION
+  CLOUD_API
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+enum Direction {
+  IN
+  OUT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  CONTACT
+  SYSTEM
+  UNKNOWN
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  RECEIVED
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum CampaignStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  DONE
+  CANCELED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  passwordHash  String
+  role          Role           @default(AGENT)
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  conversations Conversation[]
+  messages      Message[]
+  deals         Deal[]
+  history       HistoryEvent[]
+  campaigns     Campaign[]
+}
+
+/// Uma conexão = um número de WhatsApp. As credenciais ficam em variáveis de ambiente;
+/// aqui guardamos apenas qual provedor e qual instância/phone_number_id usar.
+model Connection {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  provider      Provider       @default(EVOLUTION)
+  /// Evolution: nome da instância. Cloud API: phone_number_id.
+  instanceName  String
+  status        String         @default("unknown")
+  phone         String?
+  isDefault     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+  campaigns     Campaign[]
+}
+
+model Contact {
+  id           String              @id @default(cuid())
+  name         String?
+  pushName     String?
+  /// Somente dígitos, com DDI (ex.: 5547999998888)
+  phone        String              @unique
+  email        String?
+  site         String?
+  document     String?
+  birthDate    DateTime?
+  avatarUrl    String?
+  notes        String?
+  street       String?
+  number       String?
+  district     String?
+  city         String?
+  state        String?
+  zipCode      String?
+  customFields Json?
+  optOut       Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  tags         ContactTag[]
+  lists        ContactListMember[]
+  conversations Conversation[]
+  deals        Deal[]
+  history      HistoryEvent[]
+  campaignRecipients CampaignRecipient[]
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  color    String       @default("#3b82f6")
+  contacts ContactTag[]
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+}
+
+model ContactList {
+  id        String              @id @default(cuid())
+  name      String              @unique
+  createdAt DateTime            @default(now())
+  members   ContactListMember[]
+  campaigns Campaign[]
+}
+
+model ContactListMember {
+  listId    String
+  contactId String
+  addedAt   DateTime    @default(now())
+  list      ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  contact   Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([listId, contactId])
+}
+
+model Conversation {
+  id                 String             @id @default(cuid())
+  number             Int                @unique @default(autoincrement())
+  contactId          String
+  connectionId       String
+  status             ConversationStatus @default(OPEN)
+  assignedToId       String?
+  unreadCount        Int                @default(0)
+  lastMessageAt      DateTime           @default(now())
+  lastMessagePreview String?
+  lastMessageDirection Direction?
+  closedAt           DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  contact            Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  connection         Connection         @relation(fields: [connectionId], references: [id])
+  assignedTo         User?              @relation(fields: [assignedToId], references: [id])
+  messages           Message[]
+  history            HistoryEvent[]
+
+  @@index([status, lastMessageAt])
+  @@index([contactId, connectionId])
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  externalId     String?       @unique
+  direction      Direction
+  type           MessageType   @default(TEXT)
+  body           String?
+  mediaPath      String?
+  mediaMime      String?
+  fileName       String?
+  status         MessageStatus @default(PENDING)
+  error          String?
+  senderUserId   String?
+  /// "campaign", "agent", "api", "phone" (enviada pelo celular)
+  source         String        @default("agent")
+  deleted        Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User?         @relation(fields: [senderUserId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+model PipelineStage {
+  id    String @id @default(cuid())
+  name  String
+  order Int
+  color String @default("#3b82f6")
+  deals Deal[]
+}
+
+model Deal {
+  id        String        @id @default(cuid())
+  number    Int           @unique @default(autoincrement())
+  title     String
+  value     Decimal       @default(0) @db.Decimal(12, 2)
+  status    DealStatus    @default(OPEN)
+  contactId String
+  stageId   String
+  ownerId   String?
+  product   String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  contact   Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  stage     PipelineStage @relation(fields: [stageId], references: [id])
+  owner     User?         @relation(fields: [ownerId], references: [id])
+}
+
+model HistoryEvent {
+  id             String        @id @default(cuid())
+  contactId      String
+  conversationId String?
+  userId         String?
+  type           String
+  description    String
+  createdAt      DateTime      @default(now())
+  contact        Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  user           User?         @relation(fields: [userId], references: [id])
+
+  @@index([contactId, createdAt])
+}
+
+model QuickReply {
+  id        String   @id @default(cuid())
+  shortcut  String   @unique
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model Campaign {
+  id             String              @id @default(cuid())
+  name           String
+  /// Aceita spintax {Oi|Olá} e variáveis {{nome}} / {{primeiro_nome}}
+  message        String
+  mediaPath      String?
+  mediaMime      String?
+  mediaFileName  String?
+  /// Cloud API: fora da janela de 24h só é permitido enviar template aprovado
+  templateName   String?
+  templateLang   String?             @default("pt_BR")
+  listId         String
+  connectionId   String
+  createdById    String?
+  minDelaySec    Int                 @default(20)
+  maxDelaySec    Int                 @default(45)
+  /// Janela de envio (hora local, 0-23)
+  windowStart    Int                 @default(8)
+  windowEnd      Int                 @default(20)
+  /// Pausa longa a cada N envios
+  batchSize      Int                 @default(50)
+  batchPauseSec  Int                 @default(600)
+  status         CampaignStatus      @default(DRAFT)
+  scheduledAt    DateTime?
+  nextSendAt     DateTime?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  list           ContactList         @relation(fields: [listId], references: [id])
+  connection     Connection          @relation(fields: [connectionId], references: [id])
+  createdBy      User?               @relation(fields: [createdById], references: [id])
+  recipients     CampaignRecipient[]
+}
+
+model CampaignRecipient {
+  id         String          @id @default(cuid())
+  campaignId String
+  contactId  String
+  status     RecipientStatus @default(PENDING)
+  error      String?
+  externalId String?
+  sentAt     DateTime?
+  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact    Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+}
