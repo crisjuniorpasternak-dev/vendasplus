@@ -17,6 +17,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://zap:zap@db:5432/zapdesk
+      DATABASE_URL_UNPOOLED: postgresql://zap:zap@db:5432/zapdesk
       UPLOAD_DIR: /data/uploads
     ports:
       - "3000:3000"
